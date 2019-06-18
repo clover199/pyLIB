@@ -1,0 +1,4 @@
+Single 0  0.05*x
+Married-filing-jointly 0  0.05*x
+Married-filing-separately 0  0.05*x
+Head-of-a-house-hold 0  0.05*x

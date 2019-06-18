@@ -1,0 +1,17 @@
+Single 100000 157500 0.24*x-5710.50
+Single 157500 200000 0.32*x-18310.50
+Single 200000 500000 0.35*x-24310.50
+Single 500000  0.37*x-34310.50
+Married-filing-jointly 100000 165000 0.22*x-8121.00
+Married-filing-jointly 165000 315000 0.24*x-11421.00
+Married-filing-jointly 315000 400000 0.32*x-36621.00
+Married-filing-jointly 400000 600000 0.35*x-48621.00
+Married-filing-jointly 600000  0.37*x-60621.00
+Married-filing-separately 100000 157500 0.24*x-5710.50
+Married-filing-separately 157500 200000 0.32*x-18310.50
+Married-filing-separately 200000 300000 0.35*x-24310.50
+Married-filing-separately 300000  0.37*x-30310.50
+Head-of-a-house-hold 100000 157500 0.24*x-7102.00
+Head-of-a-house-hold 157500 200000 0.32*x-19702.00
+Head-of-a-house-hold 200000 500000 0.35*x-25702.00
+Head-of-a-house-hold 500000  0.37*x-35702.00

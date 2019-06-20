@@ -1,66 +1,103 @@
+"""
+This file defines functions to update or get financial data.
+"""
+
 from __future__ import absolute_import, division, print_function
 import numpy as np
 import pandas as pd
 import logging
 import os
 
-"""
-This file defines functions to update or get financial data.
-"""
+root = '\\'.join(os.path.abspath(__file__).split('\\')[:-2])
+data_dir = root + "\\data_temp"
+
+# 2019-6-19
+def create_data_folder():
+    if 'data_temp' not in os.listdir(root):
+        os.chdir(root)
+        os.mkdir('data_temp')
+
+# 2019-6-19
+def remove_data_folder():
+    logger = logging.getLogger(__name__)
+    if 'data_temp' in os.listdir(root):
+        logger.warning("Deleting folder data_temp")
+        os.chdir(data_dir)
+        for name in os.listdir(data_dir):
+            os.remove(name)
+        os.chdir(root)
+        os.rmdir('data_temp')
+
+# 2019-6-19
+def load_data_from_yahoo(tickers, start=None, end=None):
+    """
+    Get historical data from Yahoo Finance
+    input:  tickers     one ticker or a list of tickers
+            start       start date, default "2000-1-1"
+            end         end date, default current
+    return whatever the website returns
+    """
+    from pandas_datareader import data as pdr
+    import sys
+    if not root in sys.path:
+        sys.path.append(root)
+    from invest.useful import convert_time
+    logger = logging.getLogger(__name__)
+    start, end = convert_time(start, end)
+    try:
+        return pdr.get_data_yahoo(tickers, start=start, end=end)
+    except:
+        logger.error("Failed to load {} from Yahoo Finance".format(tickers))
+        return pd.DataFrame()
 
 
 def update_basic_data(dt="2000-01-01"):
     """
-    Get historical data from FRED and save to local folder 'data'
+    Get historical data from FRED and save to local folder 'root/data_temp'
     """
     from pandas_datareader import data as pdr
     pdr.get_data_fred('DGS3MO', start=dt).dropna()\
-        .rename(columns={'DGS3MO':'Interest'}).to_csv('data/interest.csv')
+        .rename(columns={'DGS3MO':'Interest'}).to_csv(data_dir+'\\interest.csv')
     print("Interest data loaded and saved as 'interest.csv' from", dt, "to today")
     pdr.get_data_yahoo('^GSPC', start=dt).dropna()\
-        .rename(columns={'Close':'Market'})[['Market']].to_csv('data/market.csv')
+        .rename(columns={'Close':'Market'})[['Market']].to_csv(data_dir+'\\market.csv')
     print("Market data loaded and saved as 'market.csv' from", dt, "to today")
 
 
 def read_interest():
-    return pd.read_csv('data/interest.csv', index_col=0, parse_dates=True)["Interest"]
+    if 'interest.csv' not in os.listdir(data_dir):
+        update_basic_data()
+    return pd.read_csv(data_dir+'\\interest.csv', index_col=0, parse_dates=True)["Interest"]
 
 
 def read_market():
-    return pd.read_csv('data/market.csv', index_col=0, parse_dates=True)["Market"]
+    if 'market.csv' not in os.listdir(data_dir):
+        update_basic_data()
+    return pd.read_csv(data_dir+'\\market.csv', index_col=0, parse_dates=True)["Market"]
 
-# 2019-5-17
-def update_ETF_data(tickers, dt="2000-01-01", file_dir='data/'):
+# 2019-6-19
+def update_ETF_data(tickers, dt="2000-01-01", file_dir=data_dir):
     """
-    Get historical prices of given ETFs from Yahoo Finance and save to local folder
+    Get historical prices of given tickers from web and save to local folder
     input:  tickers     one ticker or a list of tickers
             dt          start date, default "2000-1-1"
-            file_dir    directory to save data, default 'data/'
+            file_dir    directory to save data, default 'root/data_temp'
     No return values
     """
     logger = logging.getLogger(__name__)
-    logger.info("Start date: {}".format(dt))
-    from pandas_datareader import data as pdr
+    logger.debug("Start date: {}".format(dt))
     if type(tickers)==str:
-        try:
-            data = pdr.get_data_yahoo(tickers, start=dt)
-        except:
-            logger.error("No data fetched for symbol {} using YahooDailyReader".format(tickers))
-        else:
-            data.to_csv(file_dir+'{}.csv'.format(tickers))
+        data = load_data_from_yahoo(tickers, dt)
+        data.to_csv(file_dir+'\\{}.csv'.format(tickers))
     else:
-        try:
-            data = pdr.get_data_yahoo(tickers, start=dt)
-        except:
-            logger.error("No data fetched for symbol {} using YahooDailyReader".format(tickers))
-        else:
-            for t in tickers:
-                d = data.xs(t, level=1, axis=1).dropna()
-                if d.empty:
-                    logger.error("No data fetched for symbol {} using YahooDailyReader".format(t))
-                else:
-                    d.to_csv(file_dir+'{}.csv'.format(t))
-    logger.info("Saved to folder {}".format(file_dir))
+        data = load_data_from_yahoo(tickers, dt)
+        for t in tickers:
+            d = data.xs(t, level=1, axis=1).dropna()
+            if d.empty:
+                logger.error("No data fetched for symbol {} using YahooDailyReader".format(t))
+            else:
+                d.to_csv(file_dir+'{}.csv'.format(t))
+    logger.info("Data for tickers {} saved to folder {}".format(tickers, file_dir))
 
 
 def update_precleared_ETF(dt="2000-01-01"):
@@ -99,17 +136,22 @@ def read_ETF_list():
     """ Get all ETF names in folder 'data' """
     return pd.read_csv('data/ETF_list.csv', index_col=0, header=0, encoding='ISO-8859-1')
 
-# 2019-5-17
-def read_ETF(ticker, file_dir='data/'):
+# 2019-6-19
+def read_ETF(ticker, dt='2000-1-1', file_dir=data_dir):
     """
-    Read historical data from local folder by ticker
-    input:  tickers     one ticker or a list of tickers
-            file_dir    directory to save data, default 'data/'
+    Read historical data by ticker
+    input:  ticker      one ticker
+            dt          start date, default "2000-1-1"
+            file_dir    directory to save data, default 'root/data_temp'
     Return a pandas DataFrame
     """
+    logger = logging.getLogger(__name__)
+    if not os.path.isdir(data_dir):
+        logger.error("Path {} doesn't exist".format(file_dir))
+        return pd.DataFrame()
     if '{}.csv'.format(ticker) not in os.listdir(file_dir):
-        update_ETF_data(ticker, file_dir=file_dir)
-    return pd.read_csv(file_dir+'{}.csv'.format(ticker), index_col=0, header=0, parse_dates=True)
+        update_ETF_data(ticker, dt=dt, file_dir=file_dir)
+    return pd.read_csv(file_dir+'\\{}.csv'.format(ticker), index_col=0, header=0, parse_dates=True)
 
 
 def read_portfolio(tickers, column='Adj Close', start='2010-01-01', end=None, keep_na=False):

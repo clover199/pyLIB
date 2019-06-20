@@ -7,30 +7,40 @@ import logging
 This file defines useful helper functions for invest calculations.
 """
 
-
-def convert_time(start, end):
+# 2019-6-17
+def convert_time(start=None, end=None):
     """
     Convert start and end time from string to datetime.
-    If end is None, return current time
+    input:  start   start date in string format YYYY-MM-DD
+                    If None (default), return 2000-01-01
+            end     end date in string format YYYY-MM-DD
+                    If None (default), return current datetime
+    return converted start, end
     """
+    logger = logging.getLogger(__name__)
     from datetime import datetime
-    try:
-        start = datetime.strptime(start, '%Y-%m-%d')
-    except:
-        pass
+    if start is None:
+        start = datetime(2000,1,1)
+    else:
+        try:
+            start = datetime.strptime(start, '%Y-%m-%d')
+        except:
+            logger.error("Cannot convert start: {} as type {}".format(
+                start, type(start)))
     if end is None:
         end = datetime.now()
     else:
         try:
             end = datetime.strptime(end, '%Y-%m-%d')
         except:
-            pass
+            logger.error("Cannot convert end: {} as type {}".format(
+                start, type(start)))
     return start, end
 
 
 if __name__=="__main__":
     import argparse
-    import functions
+    import useful
     from inspect import getmembers, isfunction
 
     parser = argparse.ArgumentParser(description="Useful functions")
@@ -40,8 +50,8 @@ if __name__=="__main__":
                         help='print documents of given function')
     FLAGS, unparsed = parser.parse_known_args()
     if FLAGS.list:
-        for x in getmembers(functions, isfunction):
+        for x in getmembers(useful, isfunction):
             print(x[0])
         exit()
     if not FLAGS.doc is None:
-        print(getattr(functions, FLAGS.doc).__doc__)
+        print(getattr(useful, FLAGS.doc).__doc__)

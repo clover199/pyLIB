@@ -18,10 +18,10 @@ def convert_time(start=None, end=None):
     return converted start, end
     """
     logger = logging.getLogger(__name__)
-    from datetime import datetime
+    from datetime import datetime, date
     if start is None:
         start = datetime(2000,1,1)
-    else:
+    elif type(start) not in [date, datetime, pd._libs.tslib.Timestamp]:
         try:
             start = datetime.strptime(start, '%Y-%m-%d')
         except:
@@ -29,7 +29,7 @@ def convert_time(start=None, end=None):
                 start, type(start)))
     if end is None:
         end = datetime.now()
-    else:
+    elif type(end) not in [date, datetime, pd._libs.tslib.Timestamp]:
         try:
             end = datetime.strptime(end, '%Y-%m-%d')
         except:

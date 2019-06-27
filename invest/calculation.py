@@ -74,7 +74,7 @@ def get_returns(data, style='simple', fillna=True):
     else:
         return ret.iloc[1:]
 
-# 2019-5-17
+# 2019-6-24
 def add_dividend(data, price='Close', adj='Adj_Close', out='Dividend'):
     """
     Calculate dividend from stock/bond value and adjusted value.
@@ -87,7 +87,7 @@ def add_dividend(data, price='Close', adj='Adj_Close', out='Dividend'):
     logger = logging.getLogger(__name__)
     share = data[adj] / data[price]
     share = (share - share.shift(1)) / share.shift(1)
-    data[out] = np.round(share * data.Close, 2).fillna(0)
+    data.loc[:,out] = np.round(share * data[price], 3).fillna(0)
 
 
 def get_dividend_yield(data, price='Close', div='Dividend', style='simple'):

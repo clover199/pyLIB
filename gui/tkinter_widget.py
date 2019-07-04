@@ -191,21 +191,65 @@ class my_scale(tk.Frame):
         self._logger_.debug("set value {} for my_scale".format(val))
         self.scale.set(self._val_rev_[val])
 
-
+# 2019-7-4
 class plot_embed(tk.Frame):
-    def __init__(self, master, fig=None):
+    def __init__(self, master, fig=None, x_scroll=False, y_scroll=False):
         super().__init__(master)
-        import matplotlib.pyplot as plt
-        from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
+        from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
         if fig is None:
+            import matplotlib.pyplot as plt
             fig = plt.figure()
             fig.add_subplot(111)
-        self.axes = fig.axes[0]
-        self._canvas_ = FigureCanvasTkAgg(fig, self)
-        self._canvas_.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        self.fig = fig
+        self.canvas = tk.Canvas(self)
+        self.canvas.grid(row=0, column=0, sticky='SNEW')
+        self._canvas_ = FigureCanvasTkAgg(fig, self.canvas)
+        window = self._canvas_.get_tk_widget()
+        window.pack()
+
+        if x_scroll:
+            hbar = tk.Scrollbar(self, orient=tk.HORIZONTAL)
+            hbar.grid(row=1, column=0, sticky='EW')
+            hbar.config(command=self.canvas.xview)
+            self.canvas.config(xscrollcommand=hbar.set)
+
+        if y_scroll:
+            vbar = tk.Scrollbar(self)
+            vbar.grid(row=0, column=1, sticky='SN')
+            vbar.config(command=self.canvas.yview)
+            self.canvas.config(yscrollcommand=vbar.set)
+
+        if x_scroll or y_scroll:
+            self.canvas.create_window(0, 0, window=window)
+            self.canvas.config(scrollregion=self.canvas.bbox(tk.constants.ALL))
+
 
     def show(self):
         self._canvas_.show()
+
+    def fig_config(self, **kwarg):
+        self._canvas_.get_tk_widget().config(kwarg)
+
+# 2019-7-4
+class plot_embed_toolbar(tk.Frame):
+    def __init__(self, master, fig=None):
+        super().__init__(master)
+        from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
+        if fig is None:
+            import matplotlib.pyplot as plt
+            fig = plt.figure()
+            fig.add_subplot(111)
+        self.fig = fig
+        self._canvas_ = FigureCanvasTkAgg(fig, self)
+        self._canvas_.get_tk_widget().pack()
+        toolbar = NavigationToolbar2TkAgg(self._canvas_, self)
+        toolbar.update()
+
+    def show(self):
+        self._canvas_.show()
+
+    def config(self, **kwarg):
+        self._canvas_.get_tk_widget().config(kwarg)
 
 
 class plot(tk.Frame):

@@ -198,7 +198,7 @@ def get_return_vol(data, scale=1, ret=False, plotit=False):
 
 # 2019-5-??
 def minimize_risk(data, returns=None, strict=True, riskfree=None, max_alloc=1,
-                  shot_sell=False, scale=1, ret=False, verbose=True, plotit=False):
+                  short_sell=False, scale=1, ret=False, verbose=True, plotit=False):
     """
     Calculate the portfolio with the lowest risk given returns.
     input:  data        a DataFrame with ETF prices or returns

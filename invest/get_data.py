@@ -76,21 +76,21 @@ def read_market():
     return pd.read_csv(data_dir+'\\market.csv', index_col=0, parse_dates=True)["Market"]
 
 # 2019-6-19
-def update_ETF_data(tickers, dt="2000-01-01", file_dir=data_dir):
+def update_ETF_data(tickers, start="2000-01-01", file_dir=data_dir):
     """
     Get historical prices of given tickers from web and save to local folder
     input:  tickers     one ticker or a list of tickers
-            dt          start date, default "2000-1-1"
+            start       start date, default "2000-1-1"
             file_dir    directory to save data, default 'root/data_temp'
     No return values
     """
     logger = logging.getLogger(__name__)
-    logger.debug("Start date: {}".format(dt))
+    logger.debug("Start date: {}".format(start))
     if type(tickers)==str:
-        data = load_data_from_yahoo(tickers, dt)
+        data = load_data_from_yahoo(tickers, start)
         data.to_csv(file_dir+'\\{}.csv'.format(tickers))
     else:
-        data = load_data_from_yahoo(tickers, dt)
+        data = load_data_from_yahoo(tickers, start)
         for t in tickers:
             d = data.xs(t, level=1, axis=1).dropna()
             if d.empty:
@@ -150,26 +150,27 @@ def read_ETF(ticker, dt='2000-1-1', file_dir=data_dir):
         logger.error("Path {} doesn't exist".format(file_dir))
         return pd.DataFrame()
     if '{}.csv'.format(ticker) not in os.listdir(file_dir):
-        update_ETF_data(ticker, dt=dt, file_dir=file_dir)
+        update_ETF_data(ticker, dt, file_dir)
     return pd.read_csv(file_dir+'\\{}.csv'.format(ticker), index_col=0, header=0, parse_dates=True)
 
-
-def read_portfolio(tickers, column='Adj Close', start='2010-01-01', end=None, keep_na=False):
+# 2019-7-6
+def read_portfolio(tickers, column='Adj Close', start='2010-01-01', end=None, keep_na=False, file_dir=data_dir):
     """
     Get weekly data for the given portfolio.
-    input:  tickers a list of tickers of the stocks to consider
-            column  the column of data to use
-            start   start date
-            end     end date, default current date
-            keep_na indicate whether to keep the ETFs that begin after 'start'
-                    default False.
+    input:  tickers     a list of tickers of the stocks to consider
+            column      the column of data to use
+            start       start date, default "2000-1-1"
+            end         end date, default current date
+            keep_na     indicate whether to keep the ETFs that begin after 'start'
+                        default False.
+            file_dir    directory to save data, default 'root/data_temp'
     """
     from invest.useful import convert_time
     from datetime import timedelta
     start, end = convert_time(start, end)
     data = []
     for t in tickers:
-        data.append(read_ETF(t).Close.rename(t))
+        data.append(read_ETF(t, start, file_dir)[column].rename(t))
     data = pd.concat(data, axis=1)[start:end]
     if keep_na:
         return data

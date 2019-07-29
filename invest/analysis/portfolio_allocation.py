@@ -13,29 +13,28 @@ from datetime import date
 
 from gui.tkinter_widget import left_right_list, plot_embed, my_scale, my_entry
 from invest.calculation import get_returns, get_return_vol, minimize_risk
-from invest.get_data import read_ETF, read_portfolio
+from invest.get_data import update_ETF_data, read_ETF, read_portfolio
 from invest.plot import return_vol, pie_plot
 from time_series.functions import resample
 
-# 2019-7-6
+# 2019-7-10
 class portfolio_window(tk.Frame):
     def __init__(self, master, file):
         """
         input:  file    a csv file containing all tickers
-                        columns are Ticker
+                        should include a column: Ticker
         """
         super().__init__(master)
         self._logger_ = logging.getLogger(__name__)
-        self._logger_.info("Initialize portfolio window")
+        self._logger_.debug("Initialize portfolio window")
 
         try:
             data = pd.read_csv(file, index_col=None).dropna()
         except Exception as err:
             self._logger_.error("Cannot open tickers file {}".format(file))
-            self._logger_.error("details:" + err)
+            self._logger_.error(err)
             return
-        self._logger_.debug("input columns: {}".format(data.columns))
-
+        self._logger_.debug("input data columns: {}".format(data.columns))
         tickers = data.Ticker.values
 
         self.select = left_right_list(self, [], tickers, command=self.update_plot,
@@ -57,9 +56,9 @@ class portfolio_window(tk.Frame):
         self.plot_pie.grid(row=3, rowspan=3, column=0)
 
         self.length = my_scale(self, name='Duration:', command=self.update_plot,
-                               labels=['5Y','3Y','2Y','1.5Y','1Y','3Q','2Q','1Q','1M'],
-                               values=[ 260, 156, 104,    78,  52,  39,  26,  13,   5],
-                               default=104)
+                               labels=['5Y','3Y','2Y','1.5Y','1Y','3Q','2Q','1Q','','','','','','','','1M'],
+                               values=[ 260, 156, 104,    78,  52,  39,  26,  13,12,11,10, 9, 8, 7, 6,   5],
+                               default=52)
         self.length.scale.config(length=200)
         self.length.grid(row=3, column=1, pady=10, sticky=tk.W)
 
@@ -69,9 +68,8 @@ class portfolio_window(tk.Frame):
         self.end.scale.config(length=200)
         self.end.grid(row=4, column=1, pady=10, sticky=tk.W)
 
-
         from_, _to, step = 0, 0.4, 0.01
-        returns = np.arange(from_,_to+0.0001,step)
+        returns = np.arange(from_, _to+1e-6, step)
         self.ret = my_scale(self, name='Targeted Return:', command=self.update_plot_pie,
                             labels=["{:.2%}".format(x) for x in returns],
                             values=returns, default=0.05)
@@ -79,15 +77,15 @@ class portfolio_window(tk.Frame):
         self.ret.grid(row=5, column=1, pady=10, sticky=tk.W)
         self.update_plot()
 
-    def initial_plot(self):
+        tk.Button(self, text='update data', command=self.update_data).grid(row=0,column=3)
+
+    def initial_plot(self, column='Adj Close', style='week', start='2015-1-1'):
         self._logger_.debug("Initialize plots for portfolio window")
         tickers = self.select.get_right()
-        start, end = '2000-01-01', None
         self._data_ = get_returns(
             resample(
-                read_portfolio(tickers, column='Close', start=start, end=end,
-                               keep_na=True, file_dir=path+"\\data_temp"),
-                column=None, style="week", method='close'),
+                read_portfolio(tickers, column=column, start=start),
+                column=None, style=style, method='close'),
             style='simple', fillna=False)
         self._data_['benchmark'] = 0
         data = self._data_.iloc[-52:,:-1].dropna(axis=1, how='any')
@@ -153,12 +151,18 @@ class portfolio_window(tk.Frame):
                     style='simple', fillna=False)
         self.update_plot()
 
+    def update_data(self):
+        for t in self._data_.columns:
+            update_ETF_data(t)
+        self.initial_plot()
+        self.update_plot_pie()
+
 
 if __name__=="__main__":
     import argparse
     parser = argparse.ArgumentParser(description="APP for investment")
     parser.add_argument('tickers', type=str,\
-                        help='the csv file with tickers.\n Columns are Ticker')
+                        help='the csv file with tickers.\n Should have a column: Ticker')
     parser.add_argument('--log', type=str, \
                         help='indicate what level of log information to present')
     FLAGS, unparsed = parser.parse_known_args()

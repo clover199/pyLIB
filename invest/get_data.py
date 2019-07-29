@@ -1,5 +1,5 @@
 """
-This file defines functions to update or get financial data.
+This file defines functions to update/load/read financial data.
 """
 
 from __future__ import absolute_import, division, print_function
@@ -50,7 +50,7 @@ def load_data_from_yahoo(tickers, start=None, end=None):
         logger.error("Failed to load {} from Yahoo Finance".format(tickers))
         return pd.DataFrame()
 
-
+# ----- deprecated -----
 def update_basic_data(dt="2000-01-01"):
     """
     Get historical data from FRED and save to local folder 'root/data_temp'
@@ -63,43 +63,36 @@ def update_basic_data(dt="2000-01-01"):
         .rename(columns={'Close':'Market'})[['Market']].to_csv(data_dir+'\\market.csv')
     print("Market data loaded and saved as 'market.csv' from", dt, "to today")
 
-
+# ----- deprecated -----
 def read_interest():
     if 'interest.csv' not in os.listdir(data_dir):
         update_basic_data()
     return pd.read_csv(data_dir+'\\interest.csv', index_col=0, parse_dates=True)["Interest"]
 
-
+# ----- deprecated -----
 def read_market():
     if 'market.csv' not in os.listdir(data_dir):
         update_basic_data()
     return pd.read_csv(data_dir+'\\market.csv', index_col=0, parse_dates=True)["Market"]
 
-# 2019-6-19
-def update_ETF_data(tickers, start="2000-01-01", file_dir=data_dir):
+# 2019-7-10
+def update_ETF_data(ticker, start="2000-01-01", file_dir=data_dir):
     """
     Get historical prices of given tickers from web and save to local folder
-    input:  tickers     one ticker or a list of tickers
+    input:  ticker      one ticker
             start       start date, default "2000-1-1"
             file_dir    directory to save data, default 'root/data_temp'
-    No return values
+    Return DataFrame
     """
     logger = logging.getLogger(__name__)
     logger.debug("Start date: {}".format(start))
-    if type(tickers)==str:
-        data = load_data_from_yahoo(tickers, start)
-        data.to_csv(file_dir+'\\{}.csv'.format(tickers))
-    else:
-        data = load_data_from_yahoo(tickers, start)
-        for t in tickers:
-            d = data.xs(t, level=1, axis=1).dropna()
-            if d.empty:
-                logger.error("No data fetched for symbol {} using YahooDailyReader".format(t))
-            else:
-                d.to_csv(file_dir+'{}.csv'.format(t))
-    logger.info("Data for tickers {} saved to folder {}".format(tickers, file_dir))
+    data = load_data_from_yahoo(ticker, start)
+    if not data.empty:
+        data.to_csv(file_dir+'\\{}.csv'.format(ticker))
+        logger.info("Data for ticker {} saved to folder {}".format(ticker, file_dir))
+    return data
 
-
+# ----- deprecated -----
 def update_precleared_ETF(dt="2000-01-01"):
     """
     Get historical prices of Precleared ETFs from Yahoo Finance and save to local folder 'data'
@@ -131,54 +124,96 @@ def update_precleared_ETF(dt="2000-01-01"):
     etfs = etfs[etfs.Exist==1]
     etfs[['Fund Name']].to_csv('data/ETF_list.csv')
 
-
+# ----- deprecated -----
 def read_ETF_list():
     """ Get all ETF names in folder 'data' """
     return pd.read_csv('data/ETF_list.csv', index_col=0, header=0, encoding='ISO-8859-1')
 
-# 2019-6-19
-def read_ETF(ticker, dt='2000-1-1', file_dir=data_dir):
+# 2019-7-10
+def read_ETF(ticker, start='2000-1-1', file_dir=data_dir, update=False):
     """
     Read historical data by ticker
     input:  ticker      one ticker
-            dt          start date, default "2000-1-1"
+            start       start date, default "2000-1-1"
             file_dir    directory to save data, default 'root/data_temp'
+            update      indicate whether to update local file
     Return a pandas DataFrame
     """
     logger = logging.getLogger(__name__)
     if not os.path.isdir(data_dir):
         logger.error("Path {} doesn't exist".format(file_dir))
         return pd.DataFrame()
-    if '{}.csv'.format(ticker) not in os.listdir(file_dir):
-        update_ETF_data(ticker, dt, file_dir)
-    return pd.read_csv(file_dir+'\\{}.csv'.format(ticker), index_col=0, header=0, parse_dates=True)
+    if update or '{}.csv'.format(ticker) not in os.listdir(file_dir):
+        return update_ETF_data(ticker, start, file_dir)
+    return pd.read_csv(file_dir+'\\{}.csv'.format(ticker),
+                       index_col=0, header=0, parse_dates=True)
 
-# 2019-7-6
-def read_portfolio(tickers, column='Adj Close', start='2010-01-01', end=None, keep_na=False, file_dir=data_dir):
+# 2019-7-10
+def read_portfolio(tickers, column='Adj Close', start='2000-1-1', file_dir=data_dir, update=False):
     """
     Get weekly data for the given portfolio.
     input:  tickers     a list of tickers of the stocks to consider
             column      the column of data to use
             start       start date, default "2000-1-1"
-            end         end date, default current date
-            keep_na     indicate whether to keep the ETFs that begin after 'start'
-                        default False.
-            file_dir    directory to save data, default 'root/data_temp'
+            file_dir    directory to load data, default 'root/data_temp'
+            update      indicate whether to update local file
     """
-    from invest.useful import convert_time
-    from datetime import timedelta
-    start, end = convert_time(start, end)
     data = []
     for t in tickers:
-        data.append(read_ETF(t, start, file_dir)[column].rename(t))
-    data = pd.concat(data, axis=1)[start:end]
-    if keep_na:
-        return data
-    data = data.dropna(axis=1, how='any')
-    if len(tickers)>data.shape[1]:
-        print("{} out of {} ETFs start after {}".format(len(tickers)-data.shape[1],
-                                                        len(tickers), start.date()))
+        data.append(read_ETF(t, start, file_dir, update)[column].rename(t))
+    data = pd.concat(data, axis=1)
     return data
+
+# 2019-7-18
+def get_ETF(ticker, start='2000-1-1', file_dir=data_dir):
+    """
+    Get historical data by ticker from local file or from Yahoo Finance.
+    If the local file exists and is updated today, return local file, otherwise
+    download from Yahoo. If download fails, return the local file.
+    input:  ticker      one ticker
+            start       start date, default "2000-1-1"
+            file_dir    directory to save data, default 'root/data_temp'
+                        if None, download from Yahoo
+    Return a pandas DataFrame
+    """
+    logger = logging.getLogger(__name__)
+    if file_dir is None:
+        logger.info("No file path given. Download data")
+        return load_data_from_yahoo(ticker, start=start)
+    if not os.path.isdir(data_dir):
+        logger.warning("Path {} doesn't exist. Download data".format(file_dir))
+        return load_data_from_yahoo(ticker, start=start)
+    if '{}.csv'.format(ticker) not in os.listdir(file_dir):
+        logger.info("{}.csv doesn't exist in {}. Updated".format(ticker, file_dir))
+        return update_ETF_data(ticker, start, file_dir)
+    import datetime
+    update_stamp = os.path.getmtime(file_dir+'\\{}.csv'.format(ticker))
+    update_time = datetime.datetime.fromtimestamp(update_stamp)
+    if update_time.date() == datetime.date.today():
+        logger.info("Read from {}\\{}.csv".format(file_dir, ticker))
+        return pd.read_csv(file_dir+'\\{}.csv'.format(ticker),
+                           index_col=0, header=0, parse_dates=True)
+    logger.info("Update {}\\{}.csv".format(file_dir, ticker))
+    return update_ETF_data(ticker, start, file_dir)
+
+#2019-7-20
+def get_ETFs(tickers, start='2000-1-1', file_dir=data_dir):
+    """
+    Get historical data by ticker from local file or from Yahoo Finance.
+    If the local file exists and is updated today, return local file, otherwise
+    download from Yahoo. If download fails, return the local file.
+    input:  tickers     a list of tickers
+            start       start date, default "2000-1-1"
+            file_dir    directory to save data, default 'root/data_temp'
+                        if None, download from Yahoo
+    Return a pandas DataFrame with multi-index
+    """
+    data = []
+    for t in tickers:
+        d = get_ETF(t, start=start, file_dir=file_dir)
+        d.columns = pd.MultiIndex.from_product([d.columns, [t]])
+        data.append(d)
+    return pd.concat(data, axis=1).sort_index(axis=1)
 
 
 if __name__=="__main__":
@@ -204,3 +239,5 @@ if __name__=="__main__":
     if not FLAGS.log is None:
         logging.basicConfig(format="%(asctime)s  %(levelname)s  %(name)s : %(message)s",
                             level=getattr(logging, FLAGS.log.upper()))
+
+    print(get_ETFs(["QQQ",'SPY'], start='2019-7-10', file_dir=data_dir))

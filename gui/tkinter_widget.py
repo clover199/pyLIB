@@ -3,6 +3,37 @@ import pandas as pd
 import tkinter as tk
 import logging
 
+
+# 2019-7-28
+class display_dataframe(tk.Frame):
+    def __init__(self, master, df, fontsize=10):
+        """
+        Display pandas DataFrame
+        input:  master      the frame to display
+                df          the pandas DataFrame
+                fontsize    the size of texts, default 10
+        """
+        super().__init__(master)
+        tk.Label(self, text='{}'.format(df.index.name), bg='white',
+            font='TkTextFont {} bold'.format(fontsize)).\
+            grid(row=0, column=0, padx=2, pady=2)
+        for i, col in enumerate(df.columns):
+            tk.Label(self, text="{}".format(col), bg='white',
+                font='TkTextFont {} bold'.format(fontsize)).\
+                grid(row=0, column=i+1, padx=2, pady=2)
+        bg = ['#DDDDDD'] * df.shape[0]
+        bg[1::2] = ['white'] * (df.shape[0] // 2)
+        for i, row in enumerate(df.index):
+            tk.Label(self, text="{}".format(row), bg=bg[i],
+                font='TkTextFont {} bold'.format(fontsize))\
+                .grid(row=i+1, column=0, padx=2, pady=2, sticky='WE')
+        for i in range(df.shape[0]):
+            for j in range(df.shape[1]):
+                tk.Label(self, text="{}".format(df.iloc[i,j]), bg=bg[i],
+                    font='TkTextFont {}'.format(fontsize))\
+                    .grid(row=i+1, column=j+1, padx=2, pady=2, sticky='WE')
+
+
 # 2019-5-18
 class entry_table(tk.Frame):
     def __init__(self, master, df, show_index=True, show_column=True, width=None, bg=None):
@@ -29,9 +60,9 @@ class entry_table(tk.Frame):
         if np.array(width).ndim==0:
             width = [width] * df.shape[1]
         if bg is None:
-            bg = [None] * df.shape[1]
+            bg = [None] * df.shape[0]
         if np.array(bg).ndim==0:
-            bg = [bg] * df.shape[1]
+            bg = [bg] * df.shape[0]
         for i in range(df.shape[0]):
             for j in range(df.shape[1]):
                 tk.Entry(self, textvariable=df.iat[i,j], width=width[j], bg=bg[i])\

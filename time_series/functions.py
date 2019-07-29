@@ -114,10 +114,10 @@ def resample(data, column=None, style="week", method='close'):
 
     if method=='close':
         locs =  df.groupby('group').agg(lambda x: x.index[-1]).values.flatten()
-        return data.iloc[locs[:-1]]
+        return data.iloc[locs]
     elif method=='open':
         locs = df.groupby('group').agg(lambda x: x.index[0]).values.flatten()
-        return data.iloc[locs[1:]]
+        return data.iloc[locs]
     if data.ndim==2:
         if column is None:
             raise ValueError("resample: Must provide the column name")

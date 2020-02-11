@@ -1,3 +1,4 @@
+from __future__ import absolute_import, division, print_function
 import numpy as np
 import pandas as pd
 import tkinter as tk
@@ -32,7 +33,6 @@ class display_dataframe(tk.Frame):
                 tk.Label(self, text="{}".format(df.iloc[i,j]), bg=bg[i],
                     font='TkTextFont {}'.format(fontsize))\
                     .grid(row=i+1, column=j+1, padx=2, pady=2, sticky='WE')
-
 
 # 2019-5-18
 class entry_table(tk.Frame):

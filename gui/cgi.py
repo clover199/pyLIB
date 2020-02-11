@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+from __future__ import absolute_import, division, print_function
 import cgi, cgitb
 cgitb.enable()
 import logging

@@ -1,0 +1,11 @@
+Use the following command to generate windows applications
+
+  pyinstaller.exe --onefile --windowed --noconfirm file_name.py
+
+--onefile   Create a one-file bundled executable
+--windowed  Do not provide a console window for standard i/o when running the
+            exe file
+--noconfirm Do not ask whether to delete the target folder or not
+
+The generated exe file will be dist/file_name/file_name.exe
+file_name.py can only import methods/files defined in the same folder.

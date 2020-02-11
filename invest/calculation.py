@@ -53,7 +53,7 @@ def summary(data, digits=2, name=None):
     df = df.astype({'Size':int})
     return df
 
-# 2019-5-17
+# 2019-11-5
 def get_returns(data, style='simple', fillna=True):
     """
     Calculate simple and log returns for the input time sereise data
@@ -74,22 +74,22 @@ def get_returns(data, style='simple', fillna=True):
     else:
         return ret.iloc[1:]
 
-# 2019-6-24
+# 2019-11-5
 def add_dividend(data, price='Close', adj='Adj_Close', out='Dividend'):
     """
-    Calculate dividend from stock/bond value and adjusted value.
+    Calculate dividend per share from stock/bond value and adjusted value.
     input:  data    a DataFrame with column 'Close'
             price   name of the column with original price, default 'Close'
             adj     name of the column with adjusted price, default 'Adj_Close'
-            out     name of output, default 'Dividend'
-    No return values. The original data is changed with one additional column.
+            out     name of the newly added column, default 'Dividend'
+    No return values. The original data is modified.
     """
     logger = logging.getLogger(__name__)
     share = data[adj] / data[price]
     share = (share - share.shift(1)) / share.shift(1)
     data.loc[:,out] = np.round(share * data[price], 3).fillna(0)
 
-
+# 2019-11-5
 def get_dividend_yield(data, price='Close', div='Dividend', style='simple'):
     """
     Calculate annual yield of dividend with price and dividend/adjusted price.
@@ -111,63 +111,67 @@ def get_dividend_yield(data, price='Close', div='Dividend', style='simple'):
     if style=='log':
         return np.log( 1 + ret )
 
-
-def get_alpha_beta(data, ret_type='simple', dspl=False):
+# 2019-11-5
+def get_alpha_beta(data, market, risk_free=0, scale=1, dspl=False):
     """
-    Calculate alpha and beta for input time series data using CAPM
-    R - risk_free = alpha + beta * (M - resk_free)
-    input:  data    a pandas Series
-            ret_type return type: 'simple' (default), or 'log'
-            dspl    indicate whether to display fit summary
+    Calculate alpha and beta for input time series data and market using CAPM
+        R - risk_free = alpha + beta * (M - risk_free)
+    where R is the return of the data and M is the return of the market
+    input:  data        a pandas Series for the stock/ETF data
+            market      a pandas Series for the market data
+            risk_free   a number (in percentage) for the risk-free rate, default 0
+            scale       rescale of the return, Default 1.
+                        Can be set as 252 / 52 / 12 to get annualized return from
+                        daily / weekly / monthly data.
+            dspl        indicate whether to display fit summary, default False
     return two values alpha, beta
     """
     logger = logging.getLogger(__name__)
     if data.ndim!=1:
-        raise ValueError("invest.calculation.get_alpha_beta only takes pandas Series as input data")
-    from invest.get_data import read_market, read_interest
-    df = data.to_frame()
-    df['data'] = get_returns(data, ret_type)
-    df['market'] = get_returns(read_market(), ret_type)
-    df['interest'] = read_interest()
-    df['date'] = df.index
-    df['risk_free'] = df.interest * 0.01 * (df.date-df.date.shift(1)).dt.days / 260
+        raise ValueError("invest.calculation.get_alpha_beta only takes pandas Series")
+    df = get_returns(data, style='log', fillna=False).rename("data").to_frame()
+    df['market'] = get_returns(market, style='log', fillna=False)
+    df['risk_free'] = risk_free / 100
+    # A complicated way to get risk-free rate:
+    # df['risk_free'] = df.interest * 0.01 * (df.date-df.date.shift(1)).dt.days / 260
     df.dropna(axis=0, how='any', inplace=True)
-    df['y'] = df.data - df.risk_free
-    df['x'] = df.market - df.risk_free
+    y = (df.data * scale - df.risk_free).values
+    x = (df.market * scale - df.risk_free).values
     from machine_learning.Msklearn import LinearRegression
     lm = LinearRegression(intercept=True)
-    lm.fit(df.x.values, df.y.values)
+    lm.fit(x, y)
     if dspl:
         lm.summary()
     alpha, beta = lm.beta
     return alpha, beta
 
-
-def get_VaR(data, alpha=0.99, ret=False, scale=52):
+# 2019-11-5
+def get_VaR(data, alpha=0.99, scale=52):
     """
     Calculate Value at Risk for given time series data.
-    Simple return is used.
-    input:  data    a pandas Series
+    Log return is used.
+    input:  data    a pandas Series or DataFrame
             alpha   a number or list of numbers from 0 to 1
                     confidence percentage, default 0.99
-            ret     indicate whether the input data is return or price (default).
-                    default False, and simple return is calculated
-            scale   factor if convert to annual return. Default 1.
-                    12 for monthly, 52 for weekly, and 252 for daily data
-    return  a (list of) number of losing percentage with given probability
+            scale   rescale of the return, Default 1.
+                    Can be set as 252 / 52 / 12 to get annualized return from
+                    daily / weekly / monthly data.
+    return a pandas DataFrame with columns as alphas and index as input data
+    name (Series) or columns (DataFrame)
     """
     logger = logging.getLogger(__name__)
-    if data.ndim!=1:
-        raise ValueError("invest.calculation.get_VaR only takes pandas Series as input data")
-    if ret:
-        ret = data
-    else:
-        ret = get_returns(data, 'simple')
+    ret = get_returns(data, style='log', fillna=False)
+    if ret.ndim==1:
+        ret = ret.to_frame()
     from basic.mathe import covariance
-    vol = np.sqrt(covariance(ret) * scale)
-    ret = np.mean(ret) * scale
+    vol = np.sqrt( ret.apply(covariance) * scale)
+    mean = ret.apply(np.mean) * scale
     from scipy import stats
-    return stats.norm.ppf(1-np.array(alpha), ret, vol)
+    alpha = np.array([alpha]).ravel()
+    result = pd.DataFrame(0, columns=["{:.0%}".format(x) for x in alpha], index=ret.columns)
+    for t in ret.columns:
+        result.loc[t,:] = stats.norm.ppf(1-np.array(alpha), mean[t], vol[t])
+    return result
 
 # 2019-5-17
 def get_return_vol(data, scale=1, ret=False, plotit=False):
@@ -268,6 +272,97 @@ def minimize_risk(data, returns=None, strict=True, riskfree=None, max_alloc=1,
         plt.plot(aloc.Volatility[arg]*100, aloc.Return[arg]*100, 'rX', markersize=12)
         print("Max Sharpe ratio is {:.2f}".format(sharpe[arg]))
     return aloc.astype(float)
+
+# 2019-7-29
+def mean_variance_optimization(mean, variance, returns=None, riskfree=None, alloc_lim=None,
+                               short_sell=False, strict=True, verbose=True, plotit=False):
+    """
+    Calculate the portfolio with the lowest risk given returns.
+    input:  mean        a numpy array (n,) of mean values
+            variance    a numpy array (n,n) of the covariance matrix
+            returns     a list of return values to be calculated, default mean(mean)
+            riskfree    the risk-free rate, default None.
+                        If not None, then a risk free stock is added for consideration
+            alloc_lim   a list of two numbers indicating the percentage range of one stock.
+                        Default None, i.e. no limit constraint.
+            strict      indicate whether the return value should be strict, default True
+            verbose     indicate whether to print progress bar, default True.
+            plotit      indicate whether to make Return-Volatility plots, default False.
+    Returns vol, alloc. A numpy array (m,) of minimum volatility and a numpy array (n,m)
+    of allocations. Here m is the number of given returns.
+    """
+    logger = logging.getLogger(__name__)
+    if returns is None:
+        returns = [np.mean(mean)]
+    returns = np.array(returns)
+    if alloc_lim is None:
+        var_inv = np.linalg.inv(variance)
+        ones = np.ones(mean.shape)
+        a = mean.dot(var_inv).dot(mean)
+        b = mean.dot(var_inv).dot(ones)
+        c = ones.dot(var_inv).dot(ones)
+        lambda1 = (c*returns-b) / (a*c-b*b)
+        lambda2 = (-b*returns+a) / (a*c-b*b)
+        alloc = np.kron(lambda1, var_inv.dot(mean)) + np.kron(lambda2, var_inv.dot(ones))
+        vol = np.sqrt(c*returns**2-2*b*returns+a)
+        if plotit:
+            import matplotlib.pyplot as plt
+            from invest.plot import return_vol
+            return_vol(mean, np.sqrt( np.diag(variance) ), ['']*len(returns))
+            plt.plot(aloc.Volatility*100, aloc.Return*100, '.-')
+            xs = np.linspace(np.min(mean), np.max(mean), 200)
+            ys = np.sqrt(c*xs**2-2*b*xs+a)
+            plt.plot(aloc.Volatility[arg]*100, aloc.Return[arg]*100, 'rX', markersize=12)
+            print("Max Sharpe ratio is {:.2f}".format(sharpe[arg]))
+        if riskfree is not None:
+            var_inv = np.linalg.inv(variance)
+            vol = np.abs(returns-riskfree) / np.sqrt((mean-riskfree).dot(var_inv).dot(mean-riskfree))
+            alloc = np.kron(vol*vol / (returns-riskfree), var_inv.dot(mean-riskfree))
+    # else:
+    #     n = data.shape[1]
+    #     if riskfree is None:
+    #         aloc = pd.DataFrame(columns=np.append(data.columns, ['Volatility','Return']))
+    #         bounds = [(0,max_alloc)]*n
+    #     else:
+    #         ret = np.append(ret, riskfree)
+    #         cov = np.hstack([ np.vstack([cov,np.zeros([1,n])]), np.zeros([n+1,1]) ])
+    #         aloc = pd.DataFrame(columns=np.append(data.columns, ['risk-free','Volatility','Return']))
+    #         bounds = [(0,max_alloc)]*n + [(0,1)]
+    #         n += 1
+    #     if returns is None:
+    #         returns = np.linspace(min(ret),max(ret), 25, endpoint=True)
+    #
+    #     from scipy.optimize import minimize
+    #     from basic.useful import progress_bar
+    #     def func(alpha):
+    #         def loss(x):
+    #             return x.dot(cov).dot(x)
+    #         def jac(x):
+    #             return cov.dot(x) * 2
+    #         cons1 = {'type':'eq',
+    #                  'fun': lambda x: np.ones(n).dot(x) - 1,
+    #                  'jac': lambda x: np.ones(n)}
+    #         types = 'eq'
+    #         if not strict: types = 'ineq'
+    #         cons2 = {'type':types,
+    #                  'fun': lambda x: ret.dot(x) - alpha,
+    #                  'jac': lambda x: ret}
+    #         x = minimize(loss, np.ones(n)/n, jac=jac, constraints=[cons1,cons2], bounds=bounds, method='SLSQP')
+    #         aloc.loc[alpha, :] = np.append(np.round(x['x'],4), [np.sqrt(x['fun']), ret.dot(x['x'])] )
+    #         return ""
+    #     progress_bar(returns, func, disable=not verbose)
+    #     if plotit:
+    #         import matplotlib.pyplot as plt
+    #         from invest.plot import return_vol
+    #         vol = np.sqrt( np.diag(cov) )
+    #         return_vol(ret, vol, data.columns)
+    #         plt.plot(aloc.Volatility*100, aloc.Return*100, '.-')
+    #         sharpe = aloc.Return/aloc.Volatility
+    #         arg = sharpe.argmax()
+    #         plt.plot(aloc.Volatility[arg]*100, aloc.Return[arg]*100, 'rX', markersize=12)
+    #         print("Max Sharpe ratio is {:.2f}".format(sharpe[arg]))
+    #     return aloc.astype(float)
+
 
 
 if __name__=="__main__":

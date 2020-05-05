@@ -35,7 +35,7 @@ class portfolio_window(tk.Frame):
             self._logger_.error(err)
             return
         self._logger_.debug("input data columns: {}".format(data.columns))
-        tickers = data.Ticker.values
+        tickers = np.unique(data.Ticker.values)
 
         self.select = left_right_list(self, [], tickers, command=self.update_plot,
                                       left_name='Available', right_name='Selected')
@@ -46,7 +46,6 @@ class portfolio_window(tk.Frame):
         self.benchmark = my_entry(self, name='Benchmark', button_name='set', command=self.set_benchmark)
         self.benchmark.entry.config(width=10)
         self.benchmark.grid(row=1, column=0, padx=10, pady=10)
-        tk.Label(self, text="Dow \nS&P 500: SPY\n").grid(row=2, column=0, padx=10, pady=10)
 
         fig, fig_pie = self.initial_plot()
         self.plot = plot_embed(self, fig)
@@ -56,8 +55,8 @@ class portfolio_window(tk.Frame):
         self.plot_pie.grid(row=3, rowspan=3, column=0)
 
         self.length = my_scale(self, name='Duration:', command=self.update_plot,
-                               labels=['5Y','3Y','2Y','1.5Y','1Y','3Q','2Q','1Q','','','','','','','','1M'],
-                               values=[ 260, 156, 104,    78,  52,  39,  26,  13,12,11,10, 9, 8, 7, 6,   5],
+                               labels=['5Y','3Y','2Y','1.5Y','1Y','3Q','2Q','1Q','12W','11W','10W','9W','8W','7W','6W','1M'],
+                               values=[ 260, 156, 104,    78,  52,  39,  26,  13,   12,   11,   10,   9,   8,   7,   6,   5],
                                default=52)
         self.length.scale.config(length=200)
         self.length.grid(row=3, column=1, pady=10, sticky=tk.W)

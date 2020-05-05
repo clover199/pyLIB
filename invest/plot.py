@@ -61,6 +61,8 @@ def plot_day_price(data):
 
 
 def pie_plot(values, labels):
+    logger = logging.getLogger(__name__)
+    logger.debug("Plot pie chart for invest")
     pie = plt.figure(figsize=(3,3))
     ax = pie.add_subplot(111)
     ax.axis('equal')

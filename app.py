@@ -1,43 +1,52 @@
 from __future__ import absolute_import, division, print_function
 import tkinter as tk
-from datetime import date, datetime
-
-from invest.useful import convert_time
 import subprocess
 
 class App(tk.Frame):
 
     def __init__ (self, master):
         super().__init__(master)
-        self.start = tk.StringVar()
-        self.end = tk.StringVar()
-        self.start_value = tk.StringVar()
-        self.end_value = tk.StringVar()
-        tk.Label(self, text="Start:").grid(row=0, column=0, padx=2)
-        tk.Entry(self, textvariable=self.start).grid(row=0, column=1, padx=2)
-        tk.Label(self, text="End:").grid(row=0, column=2, padx=2)
-        tk.Entry(self, textvariable=self.end).grid(row=0, column=3, padx=2)
-        tk.Button(self, text="Convert", command=self.convert).grid(row=0, column=4)
-        tk.Label(self, textvariable=self.start_value).grid(row=1, column=1, pady=2)
-        tk.Label(self, textvariable=self.end_value).grid(row=1, column=3, pady=2)
-        tk.Button(self, text="Run", command=self.run).grid(row=2, column=0)
+        tk.Label(self, text="Summary of one single stock/ETF").grid(row=0, column=0, padx=2, pady=2)
+        tk.Button(self, text="Open",
+            command=self.run('etf_describe.py'))\
+            .grid(row=0, column=1, padx=2, pady=2)
 
-    def convert(self):
-        start = self.start.get()
-        if start == "":
-            start = None
-        end = self.end.get()
-        if end == "":
-            end = None
-        start, end = convert_time(start, end)
-        self.start_value.set("{}".format(start))
-        self.end_value.set("{}".format(end))
+        tk.Label(self, text="Holdings file:").grid(row=1, column=0, padx=2, pady=2)
+        hold_dir = tk.StringVar()
+        hold_dir.set(r"C:\Users\Emma\Documents\PyLib\invest\holdings.csv")
+        tk.Entry(self, textvariable=hold_dir, width=50).grid(row=2, column=0, columnspan=2, pady=2)
+        tk.Label(self, text="Quick summary of current holdings").grid(row=3, column=0, padx=2, pady=2)
+        tk.Button(self, text="Open",
+                  command=self.run('holdings_summary.py', hold_dir))\
+            .grid(row=3, column=1, padx=2, pady=2)
+        tk.Label(self, text="Performance of current holdings").grid(row=4, column=0, padx=2, pady=2)
+        tk.Button(self, text="Open",
+                  command=self.run('holdings_performance.py', hold_dir))\
+            .grid(row=4, column=1, padx=2, pady=2)
 
-    def run(self):
-        print("test")
-        import os
-        print(os.path.abspath(__file__))
-        subprocess.call(r'C:\Users\Emma\Documents\PyLib\invest\analysis\etf_describe.bat')
+        tk.Label(self, text="Tickers file:").grid(row=5, column=0, padx=2, pady=2)
+        ticker_dir = tk.StringVar()
+        ticker_dir.set(r"C:\Users\Emma\Documents\PyLib\invest\tickers.csv")
+        tk.Entry(self, textvariable=ticker_dir, width=50).grid(row=6, column=0, columnspan=2, pady=2)
+        tk.Label(self, text="Find allocations of portfolio").grid(row=7, column=0, padx=2, pady=2)
+        tk.Button(self, text="Open",
+                  command=self.run('portfolio_allocation.py', ticker_dir))\
+            .grid(row=7, column=1, padx=2, pady=2)
+
+
+    def run(self, file_name, para=None):
+        def f():
+            bat_str = r"call C:\ProgramData\Anaconda3\Scripts\activate.bat" + "\n" \
+                    + r"python C:\Users\Emma\Documents\PyLib\invest\analysis" + "\\" \
+                    + file_name
+            if para is not None:
+                bat_str += " " + para.get()
+            with open(r"invest\analysis\temp.bat", "w") as f:
+                f.write(bat_str)
+                f.close()
+            subprocess.call(r"invest\analysis\temp.bat")
+        return f
+
 
     def show(self):
         self.pack()

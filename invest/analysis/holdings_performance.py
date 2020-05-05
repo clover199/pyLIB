@@ -16,7 +16,7 @@ if not path in sys.path:
     sys.path.append(path)
 
 
-# 2019-7-28
+# 2020-2-17
 def holdings_performance(file, frame=None):
     """
     Calculate performance of current holdings.
@@ -29,7 +29,7 @@ def holdings_performance(file, frame=None):
         holdings = pd.read_csv(file, index_col=None, parse_dates=[0]).dropna()
     except Exception as err:
         logger.error("Cannot open holdings file {}".format(file))
-        logger.error("details:" + err)
+        logger.error(err)
         return
     logger.debug("input transactions:")
     logger.debug("{} \t{}\t{}\t{}".format(*holdings.columns))
@@ -40,9 +40,10 @@ def holdings_performance(file, frame=None):
     if len(tickers)==0:
         logger.info("No data provided")
         return
-    from invest.get_data import load_data_from_yahoo, get_ETFs
+
+    from invest.get_data import get_latest_ETFs
     first_date = holdings.Date.min() - timedelta(days=7)
-    data = get_ETFs(tickers, start=first_date)
+    data = get_latest_ETFs(tickers, start=first_date)
 
     from invest.calculation import add_dividend
     for t in tickers:
@@ -57,10 +58,14 @@ def holdings_performance(file, frame=None):
     for t in tickers:
         index = output.index[output.Ticker==t]
         output.loc[index, 'Current Price'] = data['Close'][t][-1]
+        # calculate reinvested value
+        # settlement date is two business days after buy date
         dates = holdings.Date[index]
-        output.loc[index, 'Close'] = data['Close'][t][dates].values
-        output.loc[index, 'Adj Close'] = data['Adj Close'][t][dates].values
-        output.loc[index, 'Dividend'] = [data.Dividend[t][d:].sum() for d in dates.values]
+        loc = np.array([data.index.get_loc(x) for x in dates]) + 2
+        loc = np.clip(loc, 0, data.shape[0]-1)
+        output.loc[index, 'Close'] = data['Close'][t].iloc[loc].values
+        output.loc[index, 'Adj Close'] = data['Adj Close'][t].iloc[loc].values
+        output.loc[index, 'Dividend'] = [data.Dividend[t].iloc[d:].sum() for d in loc]
     output['Current Price'] = output['Current Price'].astype(float)
     output['Buy Shares'] = holdings.Shares.values
     current_share = output['Close'] / output['Adj Close'] * output['Buy Shares']
@@ -80,7 +85,7 @@ def holdings_performance(file, frame=None):
     output.to_csv(out, index=False)
     summary = output.groupby('Ticker')['Value','Capital Gain',
                                        'Dividend Gain','Total Gain'].sum()
-    print(summary)
+
     summary['Dividend Gain'] = np.round(summary['Total Gain']-summary['Capital Gain'], 2)
     summary['Value'] = np.round(summary['Value'], 2)
     summary['Capital Gain'] = np.round(summary['Capital Gain'], 2)
@@ -111,14 +116,17 @@ def holdings_performance(file, frame=None):
 
     xmin, xmax = vals.index[0], vals.index[-1]
     plt.figure(figsize=(15,5))
-    plt.plot(rets.index, rets*100, label='Weekly Return')
-    plt.plot(perf.index, (perf-1)*100, label='Performance')
-    plt.hlines(y=0, xmin=xmin, xmax=xmax, linestyles='--', color='k')
-    plt.ylabel("Return (%)", fontsize=20)
-    plt.yticks(fontsize=14)
+    plt.plot(rets.index, rets*100, color='#1f77b4')
+    plt.hlines(y=0, xmin=xmin, xmax=xmax, linestyles='--', color='#1f77b4')
+    plt.ylabel("Weekly Return (%)", fontsize=20, color='#1f77b4')
+    plt.yticks(fontsize=14, color='#1f77b4')
     plt.legend()
-    # plt.twinx()
-    # plt.plot(vals.index, vals, label='Total value')
+    plt.twinx()
+    plt.plot(perf.index, (perf-1)*100, color='#ff7f0e')
+    plt.hlines(y=0, xmin=xmin, xmax=xmax, linestyles='--', color='#ff7f0e')
+    # plt.gca().set_ylim(bottom=0)
+    plt.ylabel("Total Return (%)", fontsize=20, color='#ff7f0e')
+    plt.yticks(fontsize=14, color='#ff7f0e')
     plt.xlim(xmin, xmax)
 
     from gui.tkinter_widget import display_dataframe, plot_embed_toolbar
@@ -136,8 +144,9 @@ def holdings_performance(file, frame=None):
     display_dataframe(root, summary).grid(row=1,column=1, padx=10, pady=10)
     total_value = output['Value'].sum()
     total_invest = (output['Buy Shares'] * output['Buy Price']).sum()
+    total_gain = total_value - total_invest
     tk.Label(root, font='bold', text="total {:.2f} / {:.2f} = {:.2%}"\
-        .format(total_value, total_invest, total_value/total_invest))\
+        .format(total_gain, total_invest, total_gain/total_invest))\
         .grid(row=2, column=1, padx=10, pady=10)
     if frame is None:
         root.mainloop()
